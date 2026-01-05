@@ -60,3 +60,54 @@ export const createFood = async (req, res) => {
     res.status(500).json({ message: 'Failed to add food' });
   }
 };
+
+// update food item
+export const updateFood = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      name,
+      category,
+      price,
+      description,
+      main_image,
+      calories,
+      protein,
+      prep_time,
+      spiciness_level,
+      is_bestseller,
+      is_available,
+      allergens,
+    } = req.body;
+
+    const query = `
+      UPDATE foods SET
+      name = ?, category = ?, price = ?, description = ?, main_image = ?,
+      calories = ?, protein = ?, prep_time = ?, spiciness_level = ?,
+      is_bestseller = ?, is_available = ?, allergens = ?
+      WHERE id = ?
+    `;
+
+    await db.execute(query, [
+      name,
+      category,
+      price,
+      description,
+      main_image,
+      calories,
+      protein,
+      prep_time,
+      spiciness_level,
+      is_bestseller,
+      is_available,
+      allergens,
+      id,
+    ]);
+    res.status(200).json({ message: 'Food updated successfully' });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Failed to update food', error: error.message });
+  }
+};
