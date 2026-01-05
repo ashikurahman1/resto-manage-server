@@ -48,6 +48,7 @@ export const createOrder = async (req, res) => {
   }
 };
 
+// Get all orders (admin only)
 export const getOrders = async (req, res) => {
   try {
     const [orders] = await db.execute(`
@@ -63,5 +64,21 @@ export const getOrders = async (req, res) => {
     res
       .status(500)
       .json({ message: 'Failed to fetch orders', error: error.message });
+  }
+};
+
+// update order status (admin only)
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    await db.execute('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
+
+    res.json({ message: 'Order status updated successfully' });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Failed to update order status', error: error.message });
   }
 };
