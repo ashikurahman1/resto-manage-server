@@ -4,11 +4,10 @@ import db from '../db/mysql.js';
 export const getFoods = async (req, res) => {
   try {
     const [rows] = await db.execute('SELECT * FROM foods');
-    res.json(rows);
+    res.json(rows || []);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: 'Failed to fetch foods', error: error.message });
+    console.error('Fetch Foods Error:', error);
+    res.json([]);
   }
 };
 
@@ -26,6 +25,7 @@ export const createFood = async (req, res) => {
       prep_time,
       spiciness_level,
       is_bestseller,
+      is_available,
       allergens,
     } = req.body;
 
@@ -37,27 +37,33 @@ export const createFood = async (req, res) => {
 
     const query = `
       INSERT INTO foods
-      (name, category, price, description, main_image, calories, protein, prep_time, spiciness_level, is_bestseller, allergens)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (name, category, price, description, main_image, calories, protein, prep_time, spiciness_level, is_bestseller, is_available, allergens)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
+
+    // Robustly handle numeric fields (prevent "" from breaking INT columns)
+    const toNum = (val) => (val === undefined || val === '' || isNaN(val)) ? null : parseFloat(val);
+    const toBool = (val) => (val === true || val === 'true' || val === 1 || val === '1');
 
     await db.execute(query, [
       name,
       category,
-      price,
+      parseFloat(price),
       description,
       main_image,
-      calories,
-      protein,
-      prep_time,
-      spiciness_level,
-      is_bestseller,
+      toNum(calories),
+      toNum(protein),
+      toNum(prep_time),
+      toNum(spiciness_level) || 1,
+      toBool(is_bestseller) ? 1 : 0,
+      is_available === undefined ? 1 : (toBool(is_available) ? 1 : 0),
       allergens,
     ]);
 
     res.status(201).json({ message: 'Food added successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to add food' });
+    console.error('Create Food Error:', error);
+    res.status(500).json({ message: 'Failed to add food', error: error.message });
   }
 };
 
@@ -89,18 +95,22 @@ export const updateFood = async (req, res) => {
       WHERE id = ?
     `;
 
+    // Robustly handle numeric fields (prevent "" from breaking INT columns)
+    const toNum = (val) => (val === undefined || val === '' || isNaN(val)) ? null : parseFloat(val);
+    const toBool = (val) => (val === true || val === 'true' || val === 1 || val === '1');
+
     await db.execute(query, [
       name,
       category,
-      price,
+      parseFloat(price),
       description,
       main_image,
-      calories,
-      protein,
-      prep_time,
-      spiciness_level,
-      is_bestseller,
-      is_available,
+      toNum(calories),
+      toNum(protein),
+      toNum(prep_time),
+      toNum(spiciness_level) || 1,
+      toBool(is_bestseller) ? 1 : 0,
+      toBool(is_available) ? 1 : 0,
       allergens,
       id,
     ]);
