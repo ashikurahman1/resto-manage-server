@@ -52,35 +52,37 @@ export const createOrder = async (req, res) => {
 export const getUserOrders = async (req, res) => {
   try {
     const user_id = req.user.id;
-    const [orders] = await db.execute(`
-            SELECT o.id, o.total_price, o.status, o.created_at, o.address, o.phone,
-                   JSON_ARRAYAGG(
-                     JSON_OBJECT(
-                       'food_id', oi.food_id,
-                       'quantity', oi.quantity,
-                       'price', oi.price,
-                       'food_name', COALESCE(f.name, 'Unavailable'),
-                       'food_image', COALESCE(f.main_image, '')
-                     )
-                   ) as items
-            FROM orders o
-            LEFT JOIN order_items oi ON o.id = oi.order_id
-            LEFT JOIN foods f ON oi.food_id = f.id
-            WHERE o.user_id = ?
-            GROUP BY o.id
-            ORDER BY o.created_at DESC
-        `, [user_id]);
 
-    // Handle JSON_ARRAYAGG potential issues (some MySQL versions return it as a string)
+    // 1. Fetch Orders
+    const [orders] = await db.execute(
+      'SELECT id, total_price, status, created_at, address, phone FROM orders WHERE user_id = ? ORDER BY created_at DESC',
+      [user_id]
+    );
+
+    if (orders.length === 0) {
+      return res.json([]);
+    }
+
+    // 2. Fetch all items for these orders
+    const orderIds = orders.map(o => o.id);
+    const [items] = await db.execute(`
+      SELECT oi.order_id, oi.food_id, oi.quantity, oi.price, 
+             f.name as food_name, f.main_image as food_image
+      FROM order_items oi
+      LEFT JOIN foods f ON oi.food_id = f.id
+      WHERE oi.order_id IN (${orderIds.join(',')})
+    `);
+
+    // 3. Map items to orders
     const processedOrders = orders.map(order => ({
       ...order,
-      items: typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || [])
-    })).filter(order => order.id !== null);
+      items: items.filter(item => item.order_id === order.id)
+    }));
 
     res.json(processedOrders);
   } catch (error) {
     console.error('Fetch Orders Error:', error);
-    res.json([]); // Return empty array instead of 500
+    res.status(500).json({ message: 'Failed to fetch orders', error: error.message });
   }
 };
 
